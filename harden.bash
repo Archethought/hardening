@@ -297,7 +297,8 @@ function secure_misc_login_and_pswd_stuff
 	# Set the PASS_MAX_DAYS parameter to 90 in /etc/login.defs: PASS_MAX_DAYS 90 Modify user parameters for all users with a password set to match: # chage --maxdays 90
 	
 	#Set the PASS_WARN_AGE parameter to 7 in /etc/login.defs: 129 | P a g e PASS_WARN_AGE 7 Modify user parameters for all users with a password set to match: # chage --warndays 7
-	!/bin/bash for user in `awk -F: '($3 < 1000) {print $1 }' /etc/passwd`; do if [ $user != "root" ] then /usr/sbin/usermod -L $user if [ $user != "sync" ] && [ $user != "shutdown" ] && [ $user != "halt" ] then /usr/sbin/usermod -s /usr/sbin/nologin $user fi 130 | P a g e fi done
+	#TODO debug:
+	#for user in `awk -F: '($3 < 1000) {print $1 }' /etc/passwd`; do if [ $user != "root" ] then /usr/sbin/usermod -L $user if [ $user != "sync" ] && [ $user != "shutdown" ] && [ $user != "halt" ] then /usr/sbin/usermod -s /usr/sbin/nologin $user fi 130 | P a g e fi done
 	usermod -g 0 root
 	
 	# Edit the /etc/bash.bashrc and /etc/profile.d/cis.sh files (and the appropriate files for any other shell supported on your system) and add the following the UMASK parameter as shown: umask 077
@@ -327,9 +328,11 @@ function secure_misc_login_and_pswd_stuff
 
 function secure_os_services
 {
-
+	
 	# While applying system updates and patches helps correct known vulnerabilities, one of the best ways to protect the system against as yet unreported vulnerabilities is to disable all services that are not required for normal system operation. This prevents the exploitation of vulnerabilities discovered at a later date. If a service is not enabled, it cannot be exploited. The actions in this section of the document provide guidance on what services can be safely disabled and under which circumstances, greatly reducing the number of possible threats to the resulting system.
 
+	# noop for now
+	pwd
 }
 
 function secure_unneeded_filesystems
@@ -345,11 +348,15 @@ function secure_unneeded_filesystems
 
 	#Remediation: Edit or create the file /etc/modprobe.d/CIS.conf and add the following line:
 	#install cramfs /bin/true
+	
+	# noop for now
+	pwd
+
 }
 
 ##########
 ## Make sure OS is getting patched on a regular basis –
-apt-get upgrade
+#apt-get upgrade
 
 
 
