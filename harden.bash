@@ -1,18 +1,52 @@
-#!/bin/bash
+#!/bin/bash -e
 # run as root
 
-# Pipe any actionable items to a log file specific for that purpose
 
 #### Linux Hardening Settings
 
+##############################
+# ERROR HANDLING
+#
+# QUESTION &| tee -a occludes the error signal so the trap is not triggered
+#  &>> sends nothing to std out. 
+# Think the best option is to echo all to terminal & tee to log file from there
+
+# Pipe any actionable items to a log file specific for that purpose
+LOGFILE=piH.log
+
+# /bin/bash -e causes script to exit upon non-zero exit code. Might not ultimately be what we want.
+
+error() 
+{
+	# https://stackoverflow.com/questions/64786/error-handling-in-bash
+	# -lots of good ideas in this thread
+	
+	local parent_lineno="$1"
+	local message="$2"
+	local code="${3:-1}"
+	if [[ -n "$message" ]] ; then
+		echo "Error on or near line ${parent_lineno}: ${message}; exiting with status ${code}" 
+	else
+		echo "Error on or near line ${parent_lineno}; exiting with status ${code}"
+	fi
+	exit "${code}"
+}
+
+#trap 'echo "Encountered exit signal; closing script" | tee -a $LOGFILE' INT TERM EXIT
+trap 'error ${LINENO} | tee -a $LOGFILE' ERR INT TERM EXIT
+
+##############################
+# NOTES 
+# meaning of which mostly now escapes me
 
 #nubs inits card with partitioning with option to download image. 10 options exist, 'debian stretch' is what we use
 # Ensure US instead of UK (default)
 #sdformatter
 
 
-##########
-#
+##############################
+# HARDENING METHODS
+
 function secure_passwords
 {
 	# Might merge this with secure_logins, the root password section
@@ -62,7 +96,7 @@ function secure_logins
 
 
 	#Add the following line to the /etc/sysctl.conf file. 
-	kernel.randomize_va_space = 2
+	echo "kernel.randomize_va_space = 2" | cat >> /etc/sysctl.conf
 
 	#TODO - document
 	/usr/sbin/prelink –ua
@@ -119,6 +153,7 @@ function secure_folders
 	# Make sure folders are secure
 	# Do all mount related stuff here
 	# TODO/QUESTION Document options; meaning is not clear from man page.
+	# TODO this function must be verified/tested on R-Pi
 	
 	#/tmp
 	mount -o remount,nodev,nosuid,noexec /tmp
@@ -139,6 +174,7 @@ function secure_folders
 	# (Ensure no S* lines are returned.)
 	#TODO complete
 	# QUESTION how does automount work? autofs is a program; what is wanted here? 
+	# QUESTION What does "no S* lines are returned" mean?
 	# ls /etc/rc*.d | grep autofs 
 
 	#Set Sticky bit on writable directories
@@ -193,40 +229,45 @@ function secure_inetd
 function secure_services
 {
 	# The systemctl command is the basic command that is used to manage and control systemd
+	#TODO test & figure out how to trap
 	
 	#Disable Services
 	systemctl disable avahi-daemon
 	systemctl disable cups
-	update-rc.d isc-dhcp-server disable
-	apt-get purge slapd
-	update-rc.d rpcbind disable
-	update-rc.d nfs-kernel-server disable
 	systemctl disable bind9
 	systemctl disable vsftpd
-	update-rc.d apache2 disable
 	systemctl disable dovecot
+
+	update-rc.d isc-dhcp-server disable
+	update-rc.d rpcbind disable
+	update-rc.d nfs-kernel-server disable
+	update-rc.d apache2 disable
 	update-rc.d smbd disable
 	update-rc.d squid3 disable
 	update-rc.d snmpd disable
 
+	apt-get purge slapd
+	
 	#Set RSYNC_ENABLE to false in /etc/default/rsync:
-	RSYNC_ENABLE=false
-
-
-
-
-	#Set the net.ipv4.ip_forward parameter to 0 in /etc/sysctl.conf: 
-	net.ipv4.ip_forward=0 Modify active kernel parameters to match: 
+	# RSYNC_ENABLE=false
+	sed -i '/^[ \t]*RSYNC_ENABLE/s/true/false/' /etc/default/rsync
+	
+	#Set the net.ipv4.ip_forward parameter to 0 in /etc/sysctl.conf: 	
+	# and modify active kernel parameters to match: 
+	#net.ipv4.ip_forward=0 
+	sed -i '/^[ \t]*net.ipv4.ip_forward/s/=.*$/=0/' /etc/sysctl.conf
 	/sbin/sysctl -w net.ipv4.ip_forward=0
 	/sbin/sysctl -w net.ipv4.route.flush=1
 
-	Set the net.ipv4.conf.all.send_redirects and net.ipv4.conf.default.send_redirects parameters to 0 in /etc/sysctl.conf: 
-	net.ipv4.conf.all.send_redirects=0 net.ipv4.conf.default.send_redirects=0 Modify active kernel parameters to match: 
+	#Set the net.ipv4.conf.all.send_redirects and net.ipv4.conf.default.send_redirects parameters to 0 in /etc/sysctl.conf
+	# and modify active kernel parameters to match
+	#net.ipv4.conf.all.send_redirects=0 
+	#net.ipv4.conf.default.send_redirects=0 
+	sed -i '/^[ \t]*net.ipv4.conf.all.send_redirects/s/=.*$/=0/' /etc/sysctl.conf
+	sed -i '/^[ \t]*net.ipv4.conf.default.send_redirects/s/=.*$/=0/' /etc/sysctl.conf 
 	/sbin/sysctl -w net.ipv4.conf.all.send_redirects=0
 	/sbin/sysctl -w net.ipv4.conf.default.send_redirects=0 
 	/sbin/sysctl -w net.ipv4.route.flush=1
-
-
 
 }
 
@@ -242,7 +283,7 @@ function secure_time
 	restrict -6 default kod nomodify notrap nopeer noquery 
 	
 	#Also, make sure /etc/ntp.conf has at least one NTP server specified: server
-
+	#QUESTION: HOW? What pattern to check for and what to add if not present?
 }
 
 function secure_internet_protocol
