@@ -13,10 +13,112 @@
 
 ##########
 #
+function secure_passwords
+{
+	# Might merge this with secure_logins, the root password section
+	#
+	# libpam_cracklib is a PAM module that tests password strength
+	#
+	# TODO/QUESTION Can't install to test on my VM; moving on for now. Getting
+	# E: Could not get lock /var/lib/dpkg/lock - open (11: Resource temporarily unavailable)
+	# E: Unable to lock the administration directory (/var/lib/dpkg/), is another process using it?
+    #
+
+	#Install the libpam-cracklib package:
+	apt-get install libpam-cracklib 
+	
+	#Set the pam_cracklib.so parameters as follows in /etc/pam.d/common-password: 
+	#password required pam_cracklib.so retry=3 minlen=14 dcredit=-1 ucredit=-1 ocredit=-1 lcredit=-1
+	
+	#Edit the /etc/pam.d/login file and add the auth line below: 
+	#auth required pam_tally2.so onerr=fail audit silent deny=5 unlock_time=900
+	
+	#Set the pam_unix.so remember parameter to 5 in /etc/pam.d/common-password: 
+	#password [success=1 default=ignore] pam_unix.so obscure sha512 remember=5
+
+}
+
+function interactive_tasks
+{
+	#Create a boot password
+	# generates password hashes for GRUB
+	# TODO requires interaction
+	grub-mkpasswd-pbkdf2 
+	#Enter password: Reenter password: Your PBKDF2 is
+
+	#Make sure the root user has a password set
+	#TODO requires interaction
+	passwd root
+
+}
+
+function secure_logins
+{
+	# Do permission related stuff here
+
+	#Set User/Group Owner on bootloader config
+	chown root:root /boot/grub/grub.cfg
+	chmod og-rwx /boot/grub/grub.cfg
+
+
+	#Add the following line to the /etc/sysctl.conf file. 
+	kernel.randomize_va_space = 2
+
+	#TODO - document
+	/usr/sbin/prelink –ua
+	apt-get purge nis
+
+}
+function secure_misc_login_and_pswd_stuff
+{
+	# Put all login & password activities together, or better delineate.
+
+	# add the following line to the /etc/pam.d/su file. auth required pam_wheel.so use_uid Once this is done, create a comma separated list of users in the wheel statement in the /etc/group file.
+	
+	# Set the PASS_MAX_DAYS parameter to 90 in /etc/login.defs: PASS_MAX_DAYS 90 Modify user parameters for all users with a password set to match: # chage --maxdays 90
+	
+	#Set the PASS_WARN_AGE parameter to 7 in /etc/login.defs: 129 | P a g e PASS_WARN_AGE 7 Modify user parameters for all users with a password set to match: # chage --warndays 7
+	#TODO debug:
+	#for user in `awk -F: '($3 < 1000) {print $1 }' /etc/passwd`; do if [ $user != "root" ] then /usr/sbin/usermod -L $user if [ $user != "sync" ] && [ $user != "shutdown" ] && [ $user != "halt" ] then /usr/sbin/usermod -s /usr/sbin/nologin $user fi 130 | P a g e fi done
+	usermod -g 0 root
+	
+	# Edit the /etc/bash.bashrc and /etc/profile.d/cis.sh files (and the appropriate files for any other shell supported on your system) and add the following the UMASK parameter as shown: umask 077
+	echo umask 077  >> /etc/bash.bashrc
+	echo umask 077  >> /etc/profile.d/cis.sh
+	
+	useradd -D -f 35
+	touch /etc/motd 
+	chown root:root /etc/motd 
+	chmod 644 /etc/motd
+	chown root:root /etc/issue 
+	chmod 644 /etc/issue
+	chown root:root /etc/issue.net
+	chmod 644 /etc/issue.net
+	echo "Authorized uses only. All activity may be monitored and reported." > /etc/issue 
+	echo "Authorized uses only. All activity may be monitored and reported." >> /etc/issue.net  
+	
+	#QUESTION are these strings, or control characters?
+	#Edit the /etc/motd, /etc/issue and /etc/issue.net files and remove any lines containing \m, \r, \s or \v
+	sed -i 's/\m//g' /etc/motd
+	
+	banner-message-enable=true 
+	banner-message-text=''
+	/bin/chmod 644 /etc/passwd
+	/bin/chmod 640 /etc/shadow
+	/bin/chmod 644 /etc/group
+	/bin/chown root:root /etc/passwd
+	/bin/chown root:shadow /etc/shadow
+	/bin/chown root:root /etc/group
+	#/usr/bin/passwd –l <username>
+
+}
+
+
 function secure_folders 
 {
 	# Make sure folders are secure
 	# Do all mount related stuff here
+	# TODO/QUESTION Document options; meaning is not clear from man page.
 	
 	#/tmp
 	mount -o remount,nodev,nosuid,noexec /tmp
@@ -36,7 +138,7 @@ function secure_folders
 	#Audit: Ensure autofs is not enabled: 
 	# (Ensure no S* lines are returned.)
 	#TODO complete
-	# QUESTION how does automount work? autofs is a program 
+	# QUESTION how does automount work? autofs is a program; what is wanted here? 
 	# ls /etc/rc*.d | grep autofs 
 
 	#Set Sticky bit on writable directories
@@ -45,61 +147,47 @@ function secure_folders
 
 }
 
-function secure_logins
-{
-	# Do permission related stuff here
-
-	#Set User/Group Owner on bootloader config
-	chown root:root /boot/grub/grub.cfg
-	chmod og-rwx /boot/grub/grub.cfg
-
-	#Create a boot password
-	# TODO requires interaction
-	grub-mkpasswd-pbkdf2 Enter password: Reenter password: Your PBKDF2 is
-
-	#Make sure the root user has a password set
-	#TODO requires interaction
-	passwd root
-
-	#Add the following line to the /etc/sysctl.conf file. 
-	kernel.randomize_va_space = 2
-
-	#TODO - document
-	/usr/sbin/prelink –ua
-	apt-get purge nis
-
-}
-
 
 function secure_inetd
 {
-	# Everything /etc/inetd.conf related
+	# Everything /etc/inetd.conf related, plus a bit more
 
-	#Remove or comment out any shell, login, or exec lines in /etc/inetd.conf:
+	#DOCUMENT what these do and why	
+	apt-get purge rsh-client rsh-reload-client
+	apt-get purge xserver-xorg-core*
+
+	# Repository manager
+	#DOCUMENT what this does
+	update-rc.d xinetd disable
+
+	#QUESTION: talk matches ntalk as well. Is there more to the pattern to limit conflicts? 
+	#	I.e., are these keywords only at line start?
+	#Remove or comment out any talk or ntalk lines in /etc/inetd.conf: 
+	#examples:
+	#	talk dgram udp wait nobody.tty /usr/sbin/in.talkd in.ta lkd 
+	#	ntalk dgram udp wait nobody.tty /usr/sbin/in.ntalkd in.nt alkd
+	sed -i '/^[ \t]*n*talk/s/^/#  /' /etc/inetd.conf
+	apt-get purge talk
+
+	
+	#Remove or comment out any  lines in /etc/inetd.conf prefixed as:
 	#shell stream tcp nowait root /usr/sbin/tcpd /usr/sbin/in.rshd 
 	#login stream tcp nowait root /usr/sbin/tcpd /usr/sbin/in.rlogind 
 	#exec stream tcp nowait root /usr/sbin/tcpd /usr/sbin/in.rexecd
-	
-	apt-get purge rsh-client rsh-reload-client
-	
-	#Remove or comment out any talk or ntalk lines in /etc/inetd.conf: 
-	#talk dgram udp wait nobody.tty /usr/sbin/in.talkd in.ta lkd #ntalk dgram udp wait nobody.tty /usr/sbin/in.ntalkd in.nt alkd
-	apt-get purge talk
-	
-	Remove or comment out any telnet lines in /etc/inetd.conf: 
 	#telnet stream tcp nowait telnetd /usr/sbin/tcpd /usr/sbin/in.telnetd
-	Remove or comment out any tftp lines in /etc/inetd.conf: 
 	#tftp stream tcp nowait root internal
-
-	update-rc.d xinetd disable
-	Remove or comment out any chargen lines in /etc/inetd.conf: 
 	#chargen stream tcp nowait root internal
-	Remove or comment out any echo lines in /etc/inetd.conf:
-	 #echo stream tcp nowait root internal
-	Remove or comment out any discard lines in /etc/inetd.conf: 
+	#echo stream tcp nowait root internal
 	#discard stream tcp nowait root internal
-	# apt-get purge xserver-xorg-core*
-
+	sed -i '/^[ \t]*discard/s/^/#  /' /etc/inetd.conf
+	sed -i '/^[ \t]*echo/s/^/#  /' /etc/inetd.conf
+	sed -i '/^[ \t]*chargen/s/^/#  /' /etc/inetd.conf
+	sed -i '/^[ \t]*tftp/s/^/#  /' /etc/inetd.conf
+	sed -i '/^[ \t]*telnet/s/^/#  /' /etc/inetd.conf
+	sed -i '/^[ \t]*shell/s/^/#  /' /etc/inetd.conf
+	sed -i '/^[ \t]*lobin/s/^/#  /' /etc/inetd.conf
+	sed -i '/^[ \t]*exec/s/^/#  /' /etc/inetd.conf
+	
 }
 
 function secure_services
@@ -249,20 +337,6 @@ function secure_iptables
 
 }
 
-function secure_passwords
-{
-	# Might merge this with secure_logins, the root password section
-	
-	# libpam_cracklib, a PAM module that tests passwords to make sure 
-	#  they are not too weak during password change.
-
-	Install the libpam-cracklib package:
-	 apt-get install libpam-cracklib Set the pam_cracklib.so parameters as follows in /etc/pam.d/common-password: password required pam_cracklib.so retry=3 minlen=14 dcredit=-1 ucredit=-1 ocredit=-1 lcredit=-1
-	Edit the /etc/pam.d/login file and add the auth line below: auth required pam_tally2.so onerr=fail audit silent deny=5 unlock_time=900
-	Set the pam_unix.so remember parameter to 5 in /etc/pam.d/common-password: password [success=1 default=ignore] pam_unix.so obscure sha512 remember=5
-
-	
-}
 
 function secure_ssh
 {
@@ -288,43 +362,6 @@ function secure_ssh
 
 }
 
-function secure_misc_login_and_pswd_stuff
-{
-	# Put all login & password activities together, or better delineate.
-
-	# add the following line to the /etc/pam.d/su file. auth required pam_wheel.so use_uid Once this is done, create a comma separated list of users in the wheel statement in the /etc/group file.
-	
-	# Set the PASS_MAX_DAYS parameter to 90 in /etc/login.defs: PASS_MAX_DAYS 90 Modify user parameters for all users with a password set to match: # chage --maxdays 90
-	
-	#Set the PASS_WARN_AGE parameter to 7 in /etc/login.defs: 129 | P a g e PASS_WARN_AGE 7 Modify user parameters for all users with a password set to match: # chage --warndays 7
-	#TODO debug:
-	#for user in `awk -F: '($3 < 1000) {print $1 }' /etc/passwd`; do if [ $user != "root" ] then /usr/sbin/usermod -L $user if [ $user != "sync" ] && [ $user != "shutdown" ] && [ $user != "halt" ] then /usr/sbin/usermod -s /usr/sbin/nologin $user fi 130 | P a g e fi done
-	usermod -g 0 root
-	
-	# Edit the /etc/bash.bashrc and /etc/profile.d/cis.sh files (and the appropriate files for any other shell supported on your system) and add the following the UMASK parameter as shown: umask 077
-	useradd -D -f 35
-	touch /etc/motd 
-	# echo "Authorized uses only. All activity may be \ monitored and reported." > /etc/issue 
-	# echo "Authorized uses only. All activity may be \ monitored and reported." > /etc/issue.net  
-	chown root:root /etc/motd 
-	# chmod 644 /etc/motd
-	chown root:root /etc/issue 
-	chmod 644 /etc/issue
-	chown root:root /etc/issue.net
-	chmod 644 /etc/issue.net
-	
-	#Edit the /etc/motd, /etc/issue and /etc/issue.net files and remove any lines containing \m, \r, \s or \v
-	banner-message-enable=true 
-	banner-message-text=''
-	/bin/chmod 644 /etc/passwd
-	/bin/chmod 640 /etc/shadow
-	/bin/chmod 644 /etc/group
-	/bin/chown root:root /etc/passwd
-	/bin/chown root:shadow /etc/shadow
-	/bin/chown root:root /etc/group
-	#/usr/bin/passwd –l <username>
-
-}
 
 function secure_os_services
 {
