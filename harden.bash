@@ -252,22 +252,6 @@ function secure_services
 	# RSYNC_ENABLE=false
 	sed -i '/^[ \t]*RSYNC_ENABLE/s/true/false/' /etc/default/rsync
 	
-	#Set the net.ipv4.ip_forward parameter to 0 in /etc/sysctl.conf: 	
-	# and modify active kernel parameters to match: 
-	#net.ipv4.ip_forward=0 
-	sed -i '/^[ \t]*net.ipv4.ip_forward/s/=.*$/=0/' /etc/sysctl.conf
-	/sbin/sysctl -w net.ipv4.ip_forward=0
-	/sbin/sysctl -w net.ipv4.route.flush=1
-
-	#Set the net.ipv4.conf.all.send_redirects and net.ipv4.conf.default.send_redirects parameters to 0 in /etc/sysctl.conf
-	# and modify active kernel parameters to match
-	#net.ipv4.conf.all.send_redirects=0 
-	#net.ipv4.conf.default.send_redirects=0 
-	sed -i '/^[ \t]*net.ipv4.conf.all.send_redirects/s/=.*$/=0/' /etc/sysctl.conf
-	sed -i '/^[ \t]*net.ipv4.conf.default.send_redirects/s/=.*$/=0/' /etc/sysctl.conf 
-	/sbin/sysctl -w net.ipv4.conf.all.send_redirects=0
-	/sbin/sysctl -w net.ipv4.conf.default.send_redirects=0 
-	/sbin/sysctl -w net.ipv4.route.flush=1
 
 }
 
@@ -279,8 +263,17 @@ function secure_time
 	apt-get install ntp 
 	
 	#Ensure the following lines are in /etc/ntp.conf:
-	restrict -4 default kod nomodify notrap nopeer noquery 
-	restrict -6 default kod nomodify notrap nopeer noquery 
+	#restrict -4 default kod nomodify notrap nopeer noquery 
+	#restrict -6 default kod nomodify notrap nopeer noquery 
+	#(this will fail if the file does not exist)
+	if !grep -Fxq "restrict -4 default kod nomodify notrap nopeer noquery" /etc/ntp.conf
+	then
+		echo "restrict -4 default kod nomodify notrap nopeer noquery" | cat >> /etc/ntp.conf
+	fi
+	if !grep -Fxq "restrict -6 default kod nomodify notrap nopeer noquery" /etc/ntp.conf
+	then
+		echo "restrict -6 default kod nomodify notrap nopeer noquery" | cat >> /etc/ntp.conf
+	fi
 	
 	#Also, make sure /etc/ntp.conf has at least one NTP server specified: server
 	#QUESTION: HOW? What pattern to check for and what to add if not present?
@@ -288,42 +281,87 @@ function secure_time
 
 function secure_internet_protocol
 {
-	# All things IPv4 & IPv6 related
+	# All things IPv4 & IPv6 / /etc/sysctl.conf related
 
 	# http://mashable.com/2011/02/03/ipv4-ipv6-guide/#n3tedW35kOqZ
 	# IPv4 & IPv6 are internet protocols version 4 & 6, respectively
 	# IPv4 uses 32 bit Internet addresses
 	# IPv6 3128 bits Internet addresses
 	
-	#Set the net.ipv4.conf.all.accept_source_route and 
-	#  net.ipv4.conf.default.accept_source_route parameters to 0 in /etc/sysctl.conf:
-	net.ipv4.conf.all.accept_source_route=0 net.ipv4.conf.default.accept_source_route=0 
+
+	#QUESTION is it ok if these lines don't exist at all?
+	#Set variables in /etc/sysctl.conf:
+	#	net.ipv4.ip_forward=0
+	#	net.ipv4.conf.all.send_redirects=0 
+	#	net.ipv4.conf.default.send_redirects=0	
+	#	net.ipv4.conf.all.accept_source_route=0 
+	#	net.ipv4.conf.default.accept_source_route=0
+	#	net.ipv4.conf.all.accept_redirects=0 
+	#	net.ipv4.conf.default.accept_redirects=0 
+	#	net.ipv4.conf.all.secure_redirects=0 
+	#	net.ipv4.conf.default.secure_redirects=0 
+	#	net.ipv4.icmp_ignore_bogus_error_responses=1 
+	#	net.ipv4.tcp_syncookies=1
+	sed -i '/^[ \t]*net.ipv4.ip_forward/s/=.*$/=0/' /etc/sysctl.conf
+	sed -i '/^[ \t]*net.ipv4.conf.all.send_redirects/s/=.*$/=0/' /etc/sysctl.conf
+	sed -i '/^[ \t]*net.ipv4.conf.default.send_redirects/s/=.*$/=0/' /etc/sysctl.conf 
+	sed -i '/^[ \t]*net.ipv4.conf.all.accept_source_route/s/=.*$/=0/' /etc/sysctl.conf
+	sed -i '/^[ \t]*net.ipv4.conf.default.accept_source_route/s/=.*$/=0/' /etc/sysctl.conf
+	sed -i '/^[ \t]*net.ipv4.conf.all.accept_redirects/s/=.*$/=0/' /etc/sysctl.conf
+	sed -i '/^[ \t]*net.ipv4.conf.all.secure_redirects/s/=.*$/=0/' /etc/sysctl.conf
+	sed -i '/^[ \t]*net.ipv4.conf.default.secure_redirects/s/=.*$/=0/'	 /etc/sysctl.conf
+	sed -i '/^[ \t]*net.ipv4.conf.default.accept_redirects/s/=.*$/=0/' /etc/sysctl.conf
+	sed -i '/^[ \t]*net.ipv4.icmp_ignore_bogus_error_responses/s/=.*$/=1/' /etc/sysctl.conf
+	sed -i '/^[ \t]*net.ipv4.tcp_syncookies/s/=.*$/=1/' /etc/sysctl.conf
+
+	sed -i '/^[ \t]*net.ipv4.route.flush/s/=.*$/=1/' /etc/sysctl.conf
 	
-	#Modify active kernel parameters to match: 
+
+	#Modify active kernel parameters to match:	
+	/sbin/sysctl -w net.ipv4.ip_forward=0
+	/sbin/sysctl -w net.ipv4.conf.all.send_redirects=0
+	/sbin/sysctl -w net.ipv4.conf.default.send_redirects=0 
 	/sbin/sysctl -w net.ipv4.conf.all.accept_source_route=0
 	/sbin/sysctl -w net.ipv4.conf.default.accept_source_route=0 
-	/sbin/sysctl -w net.ipv4.route.flush=1
-	Set the net.ipv4.conf.all.accept_redirects and net.ipv4.conf.default.accept_redirects parameters to 0 in /etc/sysctl.conf: 
-	net.ipv4.conf.all.accept_redirects=0 net.ipv4.conf.default.accept_redirects=0 Modify active kernel parameters to match: 60 | P a g e
 	/sbin/sysctl -w net.ipv4.conf.all.accept_redirects=0 
 	/sbin/sysctl -w net.ipv4.conf.default.accept_redirects=0
-	/sbin/sysctl -w net.ipv4.route.flush=1
-	Set the net.ipv4.conf.all.secure_redirects and net.ipv4.conf.default.secure_redirects parameters to 0 in /etc/sysctl.conf: 
-	net.ipv4.conf.all.secure_redirects=0 net.ipv4.conf.default.secure_redirects=0 Modify active kernel parameters to match:
 	/sbin/sysctl -w net.ipv4.conf.all.secure_redirects=0
 	/sbin/sysctl -w net.ipv4.conf.default.secure_redirects=0 
-	/sbin/sysctl -w net.ipv4.route.flush=1
-	Set the net.ipv4.icmp_ignore_bogus_error_responses parameter to 1 in /etc/sysctl.conf: net.ipv4.icmp_ignore_bogus_error_responses=1 Modify active kernel parameters to match:
 	/sbin/sysctl -w net.ipv4.icmp_ignore_bogus_error_responses=1 
-	/sbin/sysctl -w net.ipv4.route.flush=1
-	Set the net.ipv4.tcp_syncookies parameter to 1 in /etc/sysctl.conf:
-	net.ipv4.tcp_syncookies=1 Modify active kernel parameters to match: 
 	/sbin/sysctl -w net.ipv4.tcp_syncookies=1
+	
 	/sbin/sysctl -w net.ipv4.route.flush=1
-	Create or edit the file /etc/sysctl.conf and add the following lines:
-	net.ipv6.conf.all.disable_ipv6=1 net.ipv6.conf.default.disable_ipv6=1 
-	net.ipv6.conf.lo.disable_ipv6=1 
-	Run the following command or reboot to apply the changes: # sysctl –p
+	
+	#Create or edit the file /etc/sysctl.conf and add the following lines:
+	#	net.ipv6.conf.all.disable_ipv6=1 
+	#	net.ipv6.conf.default.disable_ipv6=1 
+	#	net.ipv6.conf.lo.disable_ipv6=1 
+	if grep -q "^[ \t]*net.ipv6.conf.all.disable_ipv6" /etc/sysctl.conf
+	then
+		sed -i '/^[ \t]*net.ipv6.conf.all.disable_ipv6/s/=.*$/=1/' /etc/sysctl.conf
+	else
+		echo "net.ipv6.conf.all.disable_ipv6=1" | cat >> /etc/sysctl.conf
+	fi
+	if grep -q "^[ \t]*net.ipv6.conf.default.disable_ipv6" /etc/sysctl.conf
+	then
+		sed -i '/^[ \t]*net.ipv6.conf.default.disable_ipv6/s/=.*$/=1/' /etc/sysctl.conf
+	else
+		echo "net.ipv6.conf.default.disable_ipv6=1" | cat >> /etc/sysctl.conf
+	fi
+	if grep -q "^[ \t]*net.ipv6.conf.lo.disable_ipv6" /etc/sysctl.conf
+	then
+		sed -i '/^[ \t]*net.ipv6.conf.lo.disable_ipv6/s/=.*$/=1/' /etc/sysctl.conf
+	else
+		echo "net.ipv6.conf.lo.disable_ipv6=1" | cat >> /etc/sysctl.conf
+	fi	
+	
+	#QUESTION need to run sysctl on the above vars too?
+	
+
+	#Run the following command or reboot to apply the changes:  
+	sysctl –p
+	
+	#QUESTION what is this? Need to verify if these lines already exist?
 	echo "install dccp /bin/true" >> /etc/modprobe.d/CIS.conf
 	echo "install sctp /bin/true" >> /etc/modprobe.d/CIS.conf
 	echo "install rds /bin/true" >> /etc/modprobe.d/CIS.conf
