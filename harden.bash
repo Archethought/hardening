@@ -43,7 +43,27 @@ trap 'error ${LINENO} | tee -a $LOGFILE' ERR INT TERM EXIT
 # Ensure US instead of UK (default)
 #sdformatter
 
+function set_var
+{
+	# Set variable value within a file.
+	# Add line if variable does not exist, modify if it does.
+	# Usage:
+	#	set_var var delimeter value filename
+	
+	var=$1
+	delimeter=$2 #(= or space)
+	value=$3
+	filename=$4
 
+	
+	if grep -q "^[ \t]*${var}" ${filename}
+	then
+		pat="/^[ \t]*${var}/s/${delimeter}.*$/${delimeter}${value}/"
+		sed -i "${pat}" ${filename}
+	else
+		echo ${var}${delimeter}${value} | cat >> ${filename}
+	fi	
+}
 ##############################
 # HARDENING METHODS
 
@@ -336,24 +356,10 @@ function secure_internet_protocol
 	#	net.ipv6.conf.all.disable_ipv6=1 
 	#	net.ipv6.conf.default.disable_ipv6=1 
 	#	net.ipv6.conf.lo.disable_ipv6=1 
-	if grep -q "^[ \t]*net.ipv6.conf.all.disable_ipv6" /etc/sysctl.conf
-	then
-		sed -i '/^[ \t]*net.ipv6.conf.all.disable_ipv6/s/=.*$/=1/' /etc/sysctl.conf
-	else
-		echo "net.ipv6.conf.all.disable_ipv6=1" | cat >> /etc/sysctl.conf
-	fi
-	if grep -q "^[ \t]*net.ipv6.conf.default.disable_ipv6" /etc/sysctl.conf
-	then
-		sed -i '/^[ \t]*net.ipv6.conf.default.disable_ipv6/s/=.*$/=1/' /etc/sysctl.conf
-	else
-		echo "net.ipv6.conf.default.disable_ipv6=1" | cat >> /etc/sysctl.conf
-	fi
-	if grep -q "^[ \t]*net.ipv6.conf.lo.disable_ipv6" /etc/sysctl.conf
-	then
-		sed -i '/^[ \t]*net.ipv6.conf.lo.disable_ipv6/s/=.*$/=1/' /etc/sysctl.conf
-	else
-		echo "net.ipv6.conf.lo.disable_ipv6=1" | cat >> /etc/sysctl.conf
-	fi	
+	set_var net.ipv6.conf.all.disable_ipv6 = 1 /etc/sysctl.conf
+	set_var net.ipv6.conf.default.disable_ipv6 = 1 /etc/sysctl.conf
+	set_var net.ipv6.conf.lo.disable_ipv6 = 1 	/etc/sysctl.conf
+		
 	
 	#QUESTION need to run sysctl on the above vars too?
 	
@@ -367,7 +373,6 @@ function secure_internet_protocol
 	echo "install rds /bin/true" >> /etc/modprobe.d/CIS.conf
 	echo "install tipc /bin/true" >> /etc/modprobe.d/CIS.conf
 
-	
 }
 
 function secure_cron
@@ -422,30 +427,45 @@ function secure_ssh
 	# Mostly /etc/ssh/sshd_config edits
 
 	dpkg -s openssh-server
-	# Edit the /etc/ssh/sshd_config file to set the parameter as follows: Protocol 2
-	# Edit the /etc/ssh/sshd_config file to set the parameter as follows: LogLevel INFO
+	
 	chown root:root /etc/ssh/sshd_config
 	chmod 600 /etc/ssh/sshd_config
 	
-	# Edit the /etc/ssh/sshd_config file to set the parameter as follows: X11Forwarding no
-	# Edit the /etc/ssh/sshd_config file to set the parameter as follows: MaxAuthTries 4
-	# Edit the /etc/ssh/sshd_config file to set the parameter as follows: IgnoreRhosts yes
-	# Edit the /etc/ssh/sshd_config file to set the parameter as follows: HostbasedAuthentication no
-	# Edit the /etc/ssh/sshd_config file to set the parameter as follows: PermitRootLogin no
-	# Edit the /etc/ssh/sshd_config file to set the parameter as follows: PermitEmptyPasswords no
-	# Edit the /etc/ssh/sshd_config file to set the parameter as follows: PermitUserEnvironment no
-	# Edit the /etc/ssh/sshd_config file to set the parameter as follows: Ciphers aes128-ctr,aes192-ctr,aes256-ctr
-	# Edit the /etc/ssh/sshd_config file to set the parameter as follows: ClientAliveInterval 300 ClientAliveCountMax 0
-	# Edit the /etc/ssh/sshd_config file to set one or more of the parameter as follows: AllowUsers AllowGroups DenyUsers DenyGroups
-	# Edit the /etc/ssh/sshd_config file to set the parameter as follows: Banner /etc/issue.net
+	#QUESTION will all these vars be in this file already, or do I need to test?
+	# Edit the /etc/ssh/sshd_config file to set the parameters as follows: 
+	#	Protocol 2
+	#	LogLevel INFO
+	#	X11Forwarding no
+	#	MaxAuthTries 4
+	#	IgnoreRhosts yes
+	#	HostbasedAuthentication no
+	#	PermitRootLogin no
+	#	PermitEmptyPasswords no
+	#	PermitUserEnvironment no
+	#	Ciphers aes128-ctr,aes192-ctr,aes256-ctr
+	#	ClientAliveInterval 300 
+	#	ClientAliveCountMax 0
+	#	Banner /etc/issue.net
 
+	
+	
+	#QUESTION to what are these being set?
+	# Edit the /etc/ssh/sshd_config file to set one or more of the parameter as follows: 
+	#	AllowUsers AllowGroups DenyUsers DenyGroups
 }
 
 
 function secure_os_services
 {
+	#TODO/QUESTION what services can be safely disabled
 	
-	# While applying system updates and patches helps correct known vulnerabilities, one of the best ways to protect the system against as yet unreported vulnerabilities is to disable all services that are not required for normal system operation. This prevents the exploitation of vulnerabilities discovered at a later date. If a service is not enabled, it cannot be exploited. The actions in this section of the document provide guidance on what services can be safely disabled and under which circumstances, greatly reducing the number of possible threats to the resulting system.
+	# While applying system updates and patches helps correct known vulnerabilities, 
+	# one of the best ways to protect the system against as yet unreported vulnerabilities 
+	# is to disable all services that are not required for normal system operation. 
+	# This prevents the exploitation of vulnerabilities discovered at a later date. If a service 
+	# is not enabled, it cannot be exploited. The actions in this section of the document provide 
+	# guidance on what services can be safely disabled and under which circumstances, greatly reducing 
+	# the number of possible threats to the resulting system.
 
 	# noop for now
 	pwd
@@ -454,19 +474,30 @@ function secure_os_services
 function secure_unneeded_filesystems
 {
 	# Optional – I would play with this if you have the time
-	# 2.18 Disable Mounting of cramfs Filesystems (Not Scored) Profile Applicability: • 
-	#  Level 2 Description: The cramfs filesystem type is a compressed read-only Linux filesystem embedded in small footprint systems. A cramfs image can be used without having to first decompress the image. 
-
-	#Rationale: Removing support for unneeded filesystem types reduces the local attack surface of the server. If this filesystem type is not needed, disable it. 
+	# 2.18 Disable Mounting of cramfs Filesystems (Not Scored) 
+	# Profile Applicability:  
+	# Level 2 Description: The cramfs filesystem type is a compressed read-only Linux filesystem 
+	# embedded in small footprint systems. A cramfs image can be used without having to first decompress the image. 
+	# Rationale: Removing support for unneeded filesystem types reduces the local attack surface of the server. 
+	# If this filesystem type is not needed, disable it. 
 
 	#Audit: 
-	# /sbin/modprobe -n -v cramfs install /bin/true # /sbin/lsmod | grep cramfs 22 | P a g e 
+	# /sbin/modprobe -n -v cramfs install /bin/true 
+	# /sbin/lsmod | grep cramfs 
 
 	#Remediation: Edit or create the file /etc/modprobe.d/CIS.conf and add the following line:
-	#install cramfs /bin/true
-	
-	# noop for now
-	pwd
+	#	install cramfs /bin/true
+	#QUESTION: Need to check what this file contains before just adding the line?
+	if [ ! -f /tmp/foo.txt ]
+	then
+		#touch /etc/modprobe.d/CIS.conf
+		echo "install cramfs /bin/true" | cat >> /etc/modprobe.d/CIS.conf
+	else
+		if !grep -Fxq "install cramfs /bin/true" /etc/modprobe.d/CIS.conf
+		then
+			echo "install cramfs /bin/true" | cat >> /etc/modprobe.d/CIS.conf
+		fi
+	fi
 
 }
 
