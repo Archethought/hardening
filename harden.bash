@@ -43,6 +43,8 @@ trap 'error ${LINENO} | tee -a $LOGFILE' ERR INT TERM EXIT
 # Ensure US instead of UK (default)
 #sdformatter
 
+# QUESTION: in places where I add a file line, should I see if it already exists first?
+
 function set_var
 {
 	# Set variable value within a file.
@@ -55,10 +57,9 @@ function set_var
 	value=$3
 	filename=$4
 
-	
 	if grep -q "^[ \t]*${var}" ${filename}
 	then
-		pat="/^[ \t]*${var}/s/${delimeter}.*$/${delimeter}${value}/"
+		pat="/^[ \t]*${var}/s/^.*$/${var}${delimeter}${value}/"
 		sed -i "${pat}" ${filename}
 	else
 		echo ${var}${delimeter}${value} | cat >> ${filename}
@@ -67,30 +68,7 @@ function set_var
 ##############################
 # HARDENING METHODS
 
-function secure_passwords
-{
-	# Might merge this with secure_logins, the root password section
-	#
-	# libpam_cracklib is a PAM module that tests password strength
-	#
-	# TODO/QUESTION Can't install to test on my VM; moving on for now. Getting
-	# E: Could not get lock /var/lib/dpkg/lock - open (11: Resource temporarily unavailable)
-	# E: Unable to lock the administration directory (/var/lib/dpkg/), is another process using it?
-    #
 
-	#Install the libpam-cracklib package:
-	apt-get install libpam-cracklib 
-	
-	#Set the pam_cracklib.so parameters as follows in /etc/pam.d/common-password: 
-	#password required pam_cracklib.so retry=3 minlen=14 dcredit=-1 ucredit=-1 ocredit=-1 lcredit=-1
-	
-	#Edit the /etc/pam.d/login file and add the auth line below: 
-	#auth required pam_tally2.so onerr=fail audit silent deny=5 unlock_time=900
-	
-	#Set the pam_unix.so remember parameter to 5 in /etc/pam.d/common-password: 
-	#password [success=1 default=ignore] pam_unix.so obscure sha512 remember=5
-
-}
 
 function interactive_tasks
 {
@@ -108,38 +86,75 @@ function interactive_tasks
 
 function secure_logins
 {
-	# Do permission related stuff here
+	# login & password activities 
 
+
+	#Install the libpam-cracklib package, a PAM module that tests password strength
+	apt-get install libpam-cracklib 
+	
+	#Set the pam_cracklib.so parameters as follows in /etc/pam.d/common-password: 
+	#password required pam_cracklib.so retry=3 minlen=14 dcredit=-1 ucredit=-1 ocredit=-1 lcredit=-1
+	echo "password required pam_cracklib.so retry=3 minlen=14 dcredit=-1 ucredit=-1 ocredit=-1 lcredit=-1" >> /etc/pam.d/common-password
+	
+	#Edit the /etc/pam.d/login file and add the auth line below: 
+	#auth required pam_tally2.so onerr=fail audit silent deny=5 unlock_time=900
+	echo "auth required pam_tally2.so onerr=fail audit silent deny=5 unlock_time=900" >> /etc/pam.d/login
+	
+	#Set the pam_unix.so remember parameter to 5 in /etc/pam.d/common-password: 
+	#password [success=1 default=ignore] pam_unix.so obscure sha512 remember=5
+	echo "password [success=1 default=ignore] pam_unix.so obscure sha512 remember=5" >> /etc/pam.d/common-password
+	
 	#Set User/Group Owner on bootloader config
 	chown root:root /boot/grub/grub.cfg
 	chmod og-rwx /boot/grub/grub.cfg
 
-
 	#Add the following line to the /etc/sysctl.conf file. 
-	echo "kernel.randomize_va_space = 2" | cat >> /etc/sysctl.conf
+	#kernel.randomize_va_space = 2
+	echo "kernel.randomize_va_space = 2"  >> /etc/sysctl.conf
 
-	#TODO - document
+	#QUESTION: man page implies libs need to be on command line
+	# Revert binaries and libraries to their original content before they were prelinked
 	/usr/sbin/prelink –ua
-	apt-get purge nis
-
-}
-function secure_misc_login_and_pswd_stuff
-{
-	# Put all login & password activities together, or better delineate.
-
-	# add the following line to the /etc/pam.d/su file. auth required pam_wheel.so use_uid Once this is done, create a comma separated list of users in the wheel statement in the /etc/group file.
 	
-	# Set the PASS_MAX_DAYS parameter to 90 in /etc/login.defs: PASS_MAX_DAYS 90 Modify user parameters for all users with a password set to match: # chage --maxdays 90
+	# add the following line to the /etc/pam.d/su file. 
+	#auth required pam_wheel.so use_uid 
+	echo "auth required pam_wheel.so use_uid" >> /etc/pam.d/su
 	
-	#Set the PASS_WARN_AGE parameter to 7 in /etc/login.defs: 129 | P a g e PASS_WARN_AGE 7 Modify user parameters for all users with a password set to match: # chage --warndays 7
-	#TODO debug:
-	#for user in `awk -F: '($3 < 1000) {print $1 }' /etc/passwd`; do if [ $user != "root" ] then /usr/sbin/usermod -L $user if [ $user != "sync" ] && [ $user != "shutdown" ] && [ $user != "halt" ] then /usr/sbin/usermod -s /usr/sbin/nologin $user fi 130 | P a g e fi done
+	#QUESTION: what is this? What to do with this list? Use with chage?
+	#Once this is done, create a comma separated list of users in the wheel statement in the /etc/group file.
+	
+	#Set the PASS_MAX_DAYS parameter to 90 in /etc/login.defs and 
+	# modify user parameters for all users with a password set to match:
+	#	PASS_MAX_DAYS 90 
+	set_var PASS_MAX_DAYS ' ' 90 /etc/login.defs 
+	# chage --maxdays 90
+	
+	#Set the PASS_WARN_AGE parameter to 7 in /etc/login.defs and 
+	# modify user parameters for all users with a password set to match:
+	#	PASS_WARN_AGE 7 
+	set_var  PASS_WARN_AGE ' ' 7 /etc/login.defs
+	# chage --warndays 7
+	
+
+	# Lock password for non-root users with uid < 1000
+	for user in `awk -F':' '($3 < 1000) {print $1 }' /etc/passwd`; do 
+		if [ $user != "root" ]; then 
+			/usr/sbin/usermod -L $user 
+			if [ $user != "sync" ] && [ $user != "shutdown" ] && [ $user != "halt" ]; then 
+				#prevent login by setting login shell
+				/usr/sbin/usermod -s /usr/sbin/nologin $user 
+			fi 
+		fi 
+	done
+
+	#set root group to 0
 	usermod -g 0 root
 	
 	# Edit the /etc/bash.bashrc and /etc/profile.d/cis.sh files (and the appropriate files for any other shell supported on your system) and add the following the UMASK parameter as shown: umask 077
 	echo umask 077  >> /etc/bash.bashrc
 	echo umask 077  >> /etc/profile.d/cis.sh
 	
+	#TODO: document
 	useradd -D -f 35
 	touch /etc/motd 
 	chown root:root /etc/motd 
@@ -151,10 +166,11 @@ function secure_misc_login_and_pswd_stuff
 	echo "Authorized uses only. All activity may be monitored and reported." > /etc/issue 
 	echo "Authorized uses only. All activity may be monitored and reported." >> /etc/issue.net  
 	
-	#QUESTION are these strings, or control characters?
+	#QUESTION are these strings, or control characters? What is the purpose?
 	#Edit the /etc/motd, /etc/issue and /etc/issue.net files and remove any lines containing \m, \r, \s or \v
-	sed -i 's/\m//g' /etc/motd
+	#sed -i 's/\m//g' /etc/motd
 	
+	#QUESTION should the banner msg setting be in a file?
 	banner-message-enable=true 
 	banner-message-text=''
 	/bin/chmod 644 /etc/passwd
@@ -192,7 +208,6 @@ function secure_folders
 
 	#Audit: Ensure autofs is not enabled: 
 	# (Ensure no S* lines are returned.)
-	#TODO complete
 	# QUESTION how does automount work? autofs is a program; what is wanted here? 
 	# QUESTION What does "no S* lines are returned" mean?
 	# ls /etc/rc*.d | grep autofs 
@@ -250,6 +265,9 @@ function secure_services
 {
 	# The systemctl command is the basic command that is used to manage and control systemd
 	#TODO test & figure out how to trap
+
+	# remove network information service
+	apt-get purge nis
 	
 	#Disable Services
 	systemctl disable avahi-daemon
