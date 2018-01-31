@@ -7,14 +7,16 @@
 ##############################
 # ERROR HANDLING
 #
-# QUESTION &| tee -a occludes the error signal so the trap is not triggered
+# QUESTION (suggestion on logging) 
+#  &| tee -a occludes the error signal so the trap is not triggered
 #  &>> sends nothing to std out. 
 # Think the best option is to echo all to terminal & tee to log file from there
+#
+# /bin/bash -e causes script to exit upon non-zero exit code. Might not ultimately be what we want.
+
 
 # Pipe any actionable items to a log file specific for that purpose
 LOGFILE=piH.log
-
-# /bin/bash -e causes script to exit upon non-zero exit code. Might not ultimately be what we want.
 
 error() 
 {
@@ -35,6 +37,8 @@ error()
 #trap 'echo "Encountered exit signal; closing script" | tee -a $LOGFILE' INT TERM EXIT
 trap 'error ${LINENO} | tee -a $LOGFILE' ERR INT TERM EXIT
 
+
+
 ##############################
 # NOTES 
 # meaning of which mostly now escapes me
@@ -45,29 +49,37 @@ trap 'error ${LINENO} | tee -a $LOGFILE' ERR INT TERM EXIT
 
 # QUESTION: in places where I add a file line, should I see if it already exists first?
 
+
+
+##############################
+# UTILITY FUNCTIONS
+
+
 function set_var
 {
 	# Set variable value within a file.
 	# Add line if variable does not exist, modify if it does.
 	# Usage:
-	#	set_var var delimeter value filename
+	#	set_var var delimiter value filename
 	
 	var=$1
-	delimeter=$2 #(= or space)
+	delimiter=$2 #(= or space)
 	value=$3
 	filename=$4
 
 	if grep -q "^[ \t]*${var}" ${filename}
 	then
-		pat="/^[ \t]*${var}/s/^.*$/${var}${delimeter}${value}/"
+		pat="/^[ \t]*${var}/s/^.*$/${var}${delimiter}${value}/"
 		sed -i "${pat}" ${filename}
 	else
-		echo ${var}${delimeter}${value} | cat >> ${filename}
+		echo ${var}${delimiter}${value} | cat >> ${filename}
 	fi	
 }
+
+
+
 ##############################
 # HARDENING METHODS
-
 
 
 function interactive_tasks
