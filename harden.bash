@@ -43,12 +43,12 @@ trap 'error ${LINENO} | tee -a $LOGFILE' ERR INT TERM EXIT
 # NOTES 
 # meaning of which mostly now escapes me
 
-#nubs inits card with partitioning with option to download image. 10 options exist, 'debian stretch' is what we use
+# NOOBs inits card with partitioning with option to download image. 10 options exist, 'debian stretch' is what we use
 # Ensure US instead of UK (default)
-#sdformatter
+# sdformatter
 
 # QUESTION: in places where I add a file line, should I see if it already exists first?
-# mechanics
+# CRO: yes
 
 
 
@@ -125,7 +125,7 @@ function secure_logins
 	#kernel.randomize_va_space = 2
 	echo "kernel.randomize_va_space = 2"  >> /etc/sysctl.conf
 
-	#QUESTION: man page implies libs need to be on command line
+	#QUESTION: is there a directory where this must be run?
 	# Revert binaries and libraries to their original content before they were prelinked
     # https://linux.die.net/man/8/prelink
 	/usr/sbin/prelink –ua
@@ -134,9 +134,9 @@ function secure_logins
 	#auth required pam_wheel.so use_uid 
 	echo "auth required pam_wheel.so use_uid" >> /etc/pam.d/su
 	
-	#QUESTION: what is this? What to do with this list? Use with chage?
+	#QUESTION: what is this? What to do with this list?
 	#Once this is done, create a comma separated list of users in the wheel statement in the /etc/group file.
-    # CRO
+    # DCD: wheel may be only for BSD
 	
 	#Set the PASS_MAX_DAYS parameter to 90 in /etc/login.defs and 
 	# modify user parameters for all users with a password set to match:
@@ -181,14 +181,12 @@ function secure_logins
 	echo "Authorized uses only. All activity may be monitored and reported." > /etc/issue 
 	echo "Authorized uses only. All activity may be monitored and reported." >> /etc/issue.net  
 	
-	#QUESTION are these strings, or control characters? What is the purpose?
 	#Edit the /etc/motd, /etc/issue and /etc/issue.net files and remove any lines containing \m, \r, \s or \v
-	#sed -i 's/\m//g' /etc/motd
-    # CRO
+	sed -i 's/\m//g' /etc/motd
+	sed -i 's/\r//g' /etc/motd
+	sed -i 's/\s//g' /etc/motd
+	sed -i 's/\v//g' /etc/motd
 	
-	#QUESTION should the banner msg setting be in a file?
-	banner-message-enable=true 
-	banner-message-text=''
 	/bin/chmod 644 /etc/passwd
 	/bin/chmod 640 /etc/shadow
 	/bin/chmod 644 /etc/group
@@ -196,7 +194,7 @@ function secure_logins
 	/bin/chown root:shadow /etc/shadow
 	/bin/chown root:root /etc/group
 	#/usr/bin/passwd –l <username>
-    # CRO
+    # CRO: this locks users!!! use with care, find a pre-written procedure for the "pi" user
 
 }
 
@@ -205,13 +203,17 @@ function secure_folders
 {
 	# Make sure folders are secure
 	# Do all mount related stuff here
-	# TODO/QUESTION Document options; meaning is not clear from man page.
 	# TODO this function must be verified/tested on R-Pi
+    # LEGEND:
+    # - nodev  do not allow special characters in names
+    # - nosuid stop privilege escalation for executable binaries
+    # - noexec do not allow any file to be executable
 	
 	#/tmp
 	mount -o remount,nodev,nosuid,noexec /tmp
 	mount --bind /tmp /var/tmp
-	#TODO QUESTION what is this?
+	#TODO make separate /var/tmp partition as part of the standard setup. assure mender takes care of this.
+    #/tmp /var/tmp none rw,noexec,nosuid,nodev,bind 0 0
 	#/tmp /var/tmp none bind 0 0
 
 	#/home
@@ -228,9 +230,18 @@ function secure_folders
 	#Audit: Ensure autofs is not enabled: 
 	# (Ensure no S* lines are returned.)
 	# QUESTION how does automount work? autofs is a program; what is wanted here? 
+    # autofs mounts a partition automatically, e.g. a USB Stick. disabling stops outsiders from mounting a new filesystem with an autorun on it
 	# QUESTION What does "no S* lines are returned" mean?
-	# ls /etc/rc*.d | grep autofs 
-    # CRO
+    # Example:
+    # lrwxrwxrwx 1 root root  24 Jul 21  2017 S04keyboard-setup -> ../init.d/keyboard-setup
+    # lrwxrwxrwx 1 root root  26 Jul 21  2017 S05mountdevsubfs.sh -> ../init.d/mountdevsubfs.sh
+    # ...
+    # lrwxrwxrwx 1 root root  14 Jul 21  2017 S09kmod -> ../init.d/kmod
+    # lrwxrwxrwx 1 root root  30 Jul 21  2017 S09multipath-tools-boot -> ../init.d/multipath-tools-boot
+    # 
+    # TODO
+	# for i in $(find /etc/rc*.d -type d); do grep  autofs  $i/*; done
+    
 
 	#Set Sticky bit on writable directories
 	#TODO document: what is the purpose here?
@@ -258,8 +269,9 @@ function secure_inetd
 	#	talk dgram udp wait nobody.tty /usr/sbin/in.talkd in.ta lkd 
 	#	ntalk dgram udp wait nobody.tty /usr/sbin/in.ntalkd in.nt alkd
 	sed -i '/^[ \t]*n*talk/s/^/#  /' /etc/inetd.conf
-	apt-get purge talk
+	apt-get purge ntalk talk
     # CRO remove all talk including ntalk and variants
+    # CRO what happens if you do autoremove
 	
 	#Remove or comment out any  lines in /etc/inetd.conf prefixed as:
 	#shell stream tcp nowait root /usr/sbin/tcpd /usr/sbin/in.rshd 
@@ -336,6 +348,15 @@ function secure_time
 	#Also, make sure /etc/ntp.conf has at least one NTP server specified: server
 	#QUESTION: HOW? What pattern to check for and what to add if not present?
     # CRO let's review the /etc/ntp.conf file format
+    # Assume server is in column 1 and look for that
+    # Example:
+    # echo Checking $1...
+    # PATTERN=^pool
+    # if grep -q $PATTERN $1; then
+        # echo found
+    # else
+        # echo not found
+    # fi
 }
 
 function secure_internet_protocol
@@ -348,8 +369,6 @@ function secure_internet_protocol
 	# IPv6 3128 bits Internet addresses
 	
 
-	#QUESTION is it ok if these lines don't exist at all?
-    # CRO YES
 	#Set variables in /etc/sysctl.conf:
 	#	net.ipv4.ip_forward=0
 	#	net.ipv4.conf.all.send_redirects=0 
@@ -408,12 +427,11 @@ function secure_internet_protocol
 	#Run the following command or reboot to apply the changes:  
 	sysctl –p
 	
-	#QUESTION what is this? Need to verify if these lines already exist?
-	echo "install dccp /bin/true" >> /etc/modprobe.d/CIS.conf
-	echo "install sctp /bin/true" >> /etc/modprobe.d/CIS.conf
-	echo "install rds /bin/true" >> /etc/modprobe.d/CIS.conf
-	echo "install tipc /bin/true" >> /etc/modprobe.d/CIS.conf
-    # DCD
+	#QUESTION How does CIS.conf come into existence?
+	# echo "install dccp /bin/true" >> /etc/modprobe.d/CIS.conf
+	# echo "install sctp /bin/true" >> /etc/modprobe.d/CIS.conf
+	# echo "install rds /bin/true" >> /etc/modprobe.d/CIS.conf
+	# echo "install tipc /bin/true" >> /etc/modprobe.d/CIS.conf
 
 }
 
@@ -509,6 +527,7 @@ function secure_ssh
 	#	AllowUsers AllowGroups DenyUsers DenyGroups
     # DCD defined by what account will be used, e.g. pi will not be allowed to take login
     # So AllowUsers will only allow the one you want
+    # TODO: Create a separate method
 }
 
 
@@ -523,6 +542,7 @@ function secure_os_services
 	# is not enabled, it cannot be exploited. The actions in this section of the document provide 
 	# guidance on what services can be safely disabled and under which circumstances, greatly reducing 
 	# the number of possible threats to the resulting system.
+    #
     # DCD Seek out other solutions, e.g. Ansible implementation: https://github.com/dev-sec/ansible-os-hardening
     # Risk v. Functionality, a good example is Docker
 
@@ -547,7 +567,7 @@ function secure_unneeded_filesystems
 	#Remediation: Edit or create the file /etc/modprobe.d/CIS.conf and add the following line:
 	#	install cramfs /bin/true
 	#QUESTION: Need to check what this file contains before just adding the line?
-    # DCD
+    # CRO: mnove all CIS stuff into own method, check for existence first etc. etc.
 	if [ ! -f /tmp/foo.txt ]
 	then
 		#touch /etc/modprobe.d/CIS.conf
