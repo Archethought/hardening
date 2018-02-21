@@ -488,8 +488,20 @@ function secure_ssh
 	#	ClientAliveInterval 300 
 	#	ClientAliveCountMax 0
 	#	Banner /etc/issue.net
-    # CRO Dustin says this is Done
 
+    sed -i -e 's/.*X11Forwarding.*/X11Forwarding no/' /etc/ssh/sshd_config
+	sed -i -e 's/.*LogLevel.*/LogLevel INFO/' /etc/ssh/sshd_config
+	sed -i -e 's/.*X11Forwarding.*/X11Forwarding no/' /etc/ssh/sshd_config
+	sed -i -e 's/.*MaxAuthTries.*/MaxAuthTries 4/' /etc/ssh/sshd_config
+	sed -i -e 's/.*IgnoreRhosts.*/IgnoreRhosts yes/' /etc/ssh/sshd_config
+	sed -i -e 's/.*HostbasedAuthentication.*/HostbasedAuthentication no/' /etc/ssh/sshd_config
+	sed -i -e 's/.*PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
+	sed -i -e 's/.*PermitEmptyPasswords.*/PermitEmptyPasswords no/' /etc/ssh/sshd_config
+	sed -i -e 's/.*PermitUserEnvironment.*/PermitUserEnvironment no/' /etc/ssh/sshd_config
+	sed -i -e 's/.*Ciphers.*/Ciphers aes128-ctr,aes192-ctr,aes256-ctr/' /etc/ssh/sshd_config
+	sed -i -e 's/.*ClientALiveInterval.*/ClientAliveInterval no/' /etc/ssh/sshd_config
+	sed -i -e 's/.*ClientAliveCountMax.*/ClientAliveCountMax 0/' /etc/ssh/sshd_config
+	sed -i -e 's/.*Banner.*/Banner /etc/issue.net/' /etc/ssh/sshd_config
 	
 	
 	#QUESTION to what are these being set?
