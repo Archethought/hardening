@@ -48,6 +48,7 @@ trap 'error ${LINENO} | tee -a $LOGFILE' ERR INT TERM EXIT
 #sdformatter
 
 # QUESTION: in places where I add a file line, should I see if it already exists first?
+# mechanics
 
 
 
@@ -126,6 +127,7 @@ function secure_logins
 
 	#QUESTION: man page implies libs need to be on command line
 	# Revert binaries and libraries to their original content before they were prelinked
+    # https://linux.die.net/man/8/prelink
 	/usr/sbin/prelink –ua
 	
 	# add the following line to the /etc/pam.d/su file. 
@@ -134,6 +136,7 @@ function secure_logins
 	
 	#QUESTION: what is this? What to do with this list? Use with chage?
 	#Once this is done, create a comma separated list of users in the wheel statement in the /etc/group file.
+    # CRO
 	
 	#Set the PASS_MAX_DAYS parameter to 90 in /etc/login.defs and 
 	# modify user parameters for all users with a password set to match:
@@ -181,6 +184,7 @@ function secure_logins
 	#QUESTION are these strings, or control characters? What is the purpose?
 	#Edit the /etc/motd, /etc/issue and /etc/issue.net files and remove any lines containing \m, \r, \s or \v
 	#sed -i 's/\m//g' /etc/motd
+    # CRO
 	
 	#QUESTION should the banner msg setting be in a file?
 	banner-message-enable=true 
@@ -192,6 +196,7 @@ function secure_logins
 	/bin/chown root:shadow /etc/shadow
 	/bin/chown root:root /etc/group
 	#/usr/bin/passwd –l <username>
+    # CRO
 
 }
 
@@ -218,11 +223,14 @@ function secure_folders
 	#Disable automounting *Very important
 	update-rc.d autofs disable
 
+    # CRO explain how fstab files workd
+
 	#Audit: Ensure autofs is not enabled: 
 	# (Ensure no S* lines are returned.)
 	# QUESTION how does automount work? autofs is a program; what is wanted here? 
 	# QUESTION What does "no S* lines are returned" mean?
 	# ls /etc/rc*.d | grep autofs 
+    # CRO
 
 	#Set Sticky bit on writable directories
 	#TODO document: what is the purpose here?
@@ -251,7 +259,7 @@ function secure_inetd
 	#	ntalk dgram udp wait nobody.tty /usr/sbin/in.ntalkd in.nt alkd
 	sed -i '/^[ \t]*n*talk/s/^/#  /' /etc/inetd.conf
 	apt-get purge talk
-
+    # CRO remove all talk including ntalk and variants
 	
 	#Remove or comment out any  lines in /etc/inetd.conf prefixed as:
 	#shell stream tcp nowait root /usr/sbin/tcpd /usr/sbin/in.rshd 
@@ -327,6 +335,7 @@ function secure_time
 	
 	#Also, make sure /etc/ntp.conf has at least one NTP server specified: server
 	#QUESTION: HOW? What pattern to check for and what to add if not present?
+    # CRO let's review the /etc/ntp.conf file format
 }
 
 function secure_internet_protocol
@@ -340,6 +349,7 @@ function secure_internet_protocol
 	
 
 	#QUESTION is it ok if these lines don't exist at all?
+    # CRO YES
 	#Set variables in /etc/sysctl.conf:
 	#	net.ipv4.ip_forward=0
 	#	net.ipv4.conf.all.send_redirects=0 
@@ -392,6 +402,7 @@ function secure_internet_protocol
 		
 	
 	#QUESTION need to run sysctl on the above vars too?
+    # Assume this does make things permanent, if that is the issue
 	
 
 	#Run the following command or reboot to apply the changes:  
@@ -402,6 +413,7 @@ function secure_internet_protocol
 	echo "install sctp /bin/true" >> /etc/modprobe.d/CIS.conf
 	echo "install rds /bin/true" >> /etc/modprobe.d/CIS.conf
 	echo "install tipc /bin/true" >> /etc/modprobe.d/CIS.conf
+    # DCD
 
 }
 
@@ -476,12 +488,15 @@ function secure_ssh
 	#	ClientAliveInterval 300 
 	#	ClientAliveCountMax 0
 	#	Banner /etc/issue.net
+    # CRO Dustin says this is Done
 
 	
 	
 	#QUESTION to what are these being set?
 	# Edit the /etc/ssh/sshd_config file to set one or more of the parameter as follows: 
 	#	AllowUsers AllowGroups DenyUsers DenyGroups
+    # DCD defined by what account will be used, e.g. pi will not be allowed to take login
+    # So AllowUsers will only allow the one you want
 }
 
 
@@ -496,6 +511,8 @@ function secure_os_services
 	# is not enabled, it cannot be exploited. The actions in this section of the document provide 
 	# guidance on what services can be safely disabled and under which circumstances, greatly reducing 
 	# the number of possible threats to the resulting system.
+    # DCD Seek out other solutions, e.g. Ansible implementation: https://github.com/dev-sec/ansible-os-hardening
+    # Risk v. Functionality, a good example is Docker
 
 	# noop for now
 	pwd
@@ -518,6 +535,7 @@ function secure_unneeded_filesystems
 	#Remediation: Edit or create the file /etc/modprobe.d/CIS.conf and add the following line:
 	#	install cramfs /bin/true
 	#QUESTION: Need to check what this file contains before just adding the line?
+    # DCD
 	if [ ! -f /tmp/foo.txt ]
 	then
 		#touch /etc/modprobe.d/CIS.conf
