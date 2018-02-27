@@ -1,19 +1,18 @@
 #!/bin/bash -e
 # run as root
 
-
 #### Linux Hardening Settings
+
 
 ##############################
 # ERROR HANDLING
 #
-# QUESTION (suggestion on logging) 
+# LOGGING
 #  &| tee -a occludes the error signal so the trap is not triggered
 #  &>> sends nothing to std out. 
-# Think the best option is to echo all to terminal & tee to log file from there
+# Suggest the best option is to echo all to terminal & tee to log file from there
 #
 # /bin/bash -e causes script to exit upon non-zero exit code. Might not ultimately be what we want.
-
 
 # Pipe any actionable items to a log file specific for that purpose
 LOGFILE=piH.log
@@ -55,6 +54,31 @@ trap 'error ${LINENO} | tee -a $LOGFILE' ERR INT TERM EXIT
 ##############################
 # UTILITY FUNCTIONS
 
+function add_line
+{
+	# Add line to a file; replace if similar line already exists
+	# Delete lines with test-pattern ($2) beginning a line, then add
+	# desired line ($3) at the end of the file ($1)
+	#
+	# Usage:
+	#	add_line filename test-pattern line-to-add
+	#
+	# NOTES:
+	#  -q = Quiet; do not write anything to standard output. Exit immediately with zero status 
+	#  if any match is found, even if an error was detected.
+	
+	filename=$1
+	testpat=$2
+	line=$3
+
+	if grep -q "^[ \t]*${testpat}" ${filename}
+	then
+		pat="/^[ \t]*${testpat}/d"
+		sed -i "${pat}" ${filename}
+	fi	
+	echo ${line} >> ${filename}
+
+}
 
 function set_var
 {
