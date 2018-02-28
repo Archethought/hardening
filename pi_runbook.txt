@@ -1,0 +1,140 @@
+```NOOBS
+Include WiFI in the NOOBS process
+
+Select US Keyboard
+Bottom of screen
+
+10 Enable SSH
+sudo touch /boot/ssh
+sudo reboot
+
+Copy key to unit
+ssh-copy-id pi@ps-ap8
+
+Login
+
+15 Make structure for working area
+mkdir -p working/redbear
+cd working
+
+20 Change password
+# change default password for user pi
+sudo /usr/bin/passwd pi << ZZD
+bio:pen6ya
+bio:pen6ya
+ZZD
+
+25 Update the hostname (as root user):
+hostname pi-ap8
+sudo sed -i 's/raspberrypi/pi-ap8/g' /etc/hostname
+sudo sed -i 's/raspberrypi/pi-ap8/g' /etc/hosts
+# for /etc/hosts change the entry for 127.0.1.1 from raspberrypi
+
+27 EEPROM upgrade: https://github.com/redbear/IoT_pHAT/tree/master/eeprom
+wget https://raw.githubusercontent.com/redbear/IoT_pHAT/master/eeprom/experimental/v0.5/IoT_pHAT-with-dt.eep
+wget https://raw.githubusercontent.com/redbear/IoT_pHAT/master/eeprom/experimental/v0.5/eepflash.sh
+chmod +x eepflash.sh
+sudo ./eepflash.sh -f=IoT_pHAT-with-dt.eep -t=24c32 -w
+
+TODO: Break up the basic setup, some of it is for the user, some for root. Split along those lines, especially for the sequencer.
+
+30 Basic setup (as user)
+# Setting up a Ubuntu Xenial 16.04
+sudo apt-get update
+sudo apt-get upgrade -y
+
+# Install necessary software and tools
+sudo apt-get install -y \
+git \
+vim \
+build-essential \
+tmux \
+python-dev \
+python-virtualenv \
+python-smbus \
+i2c-tools \
+libi2c-dev \
+curl
+
+# Setup vim
+cat << ZZA >> ~/.vimrc
+colorscheme elflord
+syntax on
+ZZA
+
+# !!! COPY AND PASTE MAY NOT WORK BELOW THIS LINE - REPAIR THE DASH CHARACTER !!!
+# Install battery support software
+git clone https://github.com/xorbit/LiFePO4wered­-Pi.git
+cd LiFePO4wered­-Pi
+python build.py
+sudo ./INSTALL.sh
+
+# reboot system
+
+35 Enable i2c bus (as root)
+# remember to "sudo -i"
+
+# Add the i2c module
+cat << ZZB >> /etc/modules
+i2c-bcm2708
+ZZB
+
+# Set the i2c bus speed
+cat << ZZC >> /boot/config.txt
+# set i2c bus speed
+dtparam=i2c_baudrate=100000
+ZZC
+
+40 Install ZeroMQ
+apt-get install libzmq3-dev
+
+42 Generate a key
+ssh-keygen -t rsa -b 4096 -N '' -q << ZZZ
+
+
+ZZZ
+
+50 Make and use a virtual environment
+sudo apt-get install python-pip python-virtualenv libffi-dev libssl-dev
+virtualenv venv
+. ./venv/bin/activate
+pip install pysftp
+pip install -r requirements.txt
+
+52 Install Archethought software
+# ISSUE: Do not use github. We must have our own object inventory in the MRP system. These can be populated by github
+# However, by definition, once they are in production they will never change, they will undergo revision process for parts.
+cd ~/working
+# see pysftp example below, learn more here: http://pysftp.readthedocs.io/en/release_0.2.8/cookbook.html
+
+
+#!/usr/bin/env python
+# program: get-software-part.py
+# purpose: retrieve a unit of a software BOM
+# usage: python get-software-part.py part-number [repository]
+# assumptions: 
+# - environment variables are used to communicate any security requirement, e.g. ssh key to be used
+# - an sftp server s maintained with a directory structure mirroring the BOM tree for all SKUs
+
+# get the environment variables
+# use click to get the command line params
+
+import pysftp
+# capture parameters either as environment variables or as a click command line program
+cinfo = {'host':'map-software', 'username':'pizero', 'password':'secret', 'port':2222}
+with pysftp.Connection(**cinfo) as sftp:
+    #
+    # copy all files AND directories under public to a local path
+    sftp.get_r('production-partnumber', 'production', preserve_mtime=True)
+    #
+
+Docker [OPTIONAL]
+curl -sSL https://get.docker.com | sudo -E sh
+sudo usermod -aG docker pi
+sudo reboot
+
+TODO
+# All of the steps above as a sequence file for the sequencer
+# ISSUE: How to create a base image for etch
+# ISSUE: Once etch process is completed, use this process for Mender
+```

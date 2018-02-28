@@ -298,14 +298,14 @@ function secure_inetd
     # CRO what happens if you do autoremove
 	
 	#Remove or comment out any  lines in /etc/inetd.conf prefixed as:
-	#shell stream tcp nowait root /usr/sbin/tcpd /usr/sbin/in.rshd 
-	#login stream tcp nowait root /usr/sbin/tcpd /usr/sbin/in.rlogind 
-	#exec stream tcp nowait root /usr/sbin/tcpd /usr/sbin/in.rexecd
-	#telnet stream tcp nowait telnetd /usr/sbin/tcpd /usr/sbin/in.telnetd
-	#tftp stream tcp nowait root internal
-	#chargen stream tcp nowait root internal
-	#echo stream tcp nowait root internal
-	#discard stream tcp nowait root internal
+	#	shell stream tcp nowait root /usr/sbin/tcpd /usr/sbin/in.rshd 
+	#	login stream tcp nowait root /usr/sbin/tcpd /usr/sbin/in.rlogind 
+	#	exec stream tcp nowait root /usr/sbin/tcpd /usr/sbin/in.rexecd
+	#	telnet stream tcp nowait telnetd /usr/sbin/tcpd /usr/sbin/in.telnetd
+	#	tftp stream tcp nowait root internal
+	#	chargen stream tcp nowait root internal
+	#	echo stream tcp nowait root internal
+	#	discard stream tcp nowait root internal
 	sed -i '/^[ \t]*discard/s/^/#  /' /etc/inetd.conf
 	sed -i '/^[ \t]*echo/s/^/#  /' /etc/inetd.conf
 	sed -i '/^[ \t]*chargen/s/^/#  /' /etc/inetd.conf
